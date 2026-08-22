@@ -10,10 +10,12 @@ self.addEventListener('activate', function (event) {
 });
 
 self.addEventListener('push', function (event) {
+  var title = 'Cola LoL';
   var body = 'Partida encontrada';
   if (event.data) {
     try {
       var payload = event.data.json();
+      title = payload.title || title;
       body = payload.body || body;
     } catch (e) {
       body = event.data.text() || body;
@@ -21,7 +23,7 @@ self.addEventListener('push', function (event) {
   }
 
   event.waitUntil(
-    self.registration.showNotification('Partida encontrada', {
+    self.registration.showNotification(title, {
       body: body,
       // tag + renotify: una sola notificacion en la bandeja, pero vuelve a sonar
       tag: 'lol-queue',
