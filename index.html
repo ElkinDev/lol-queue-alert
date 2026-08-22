@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aviso de cola</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin:0; min-height:100vh; display:flex; flex-direction:column;
+         align-items:center; justify-content:center; gap:20px; padding:24px;
+         font: 16px/1.55 system-ui, -apple-system, sans-serif;
+         background:#12151c; color:#e7ebf3; text-align:center; }
+  h1 { font-size:15px; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
+       color:#8b95a8; margin:0; }
+  #state { font-size:clamp(24px,7vw,38px); font-weight:700; line-height:1.15; }
+  p { color:#8b95a8; margin:0; max-width:34ch; font-size:14px; }
+  button { font:600 17px system-ui, sans-serif; color:#12151c; background:#e7ebf3;
+           border:0; border-radius:14px; padding:17px 28px; min-width:230px; }
+  button.ghost { background:transparent; color:#8b95a8; border:1px solid #2b3242;
+                 padding:12px 20px; min-width:0; font-size:14px; }
+  textarea { width:100%; max-width:520px; height:150px; background:#0b0e14; color:#7fd6a0;
+             border:1px solid #2b3242; border-radius:12px; padding:12px;
+             font:12px/1.4 ui-monospace, monospace; display:none; }
+  .ok #state { color:#3ddc84; }
+  .err #state { color:#e05260; }
+</style>
+</head>
+<body>
+  <h1>Aviso de cola</h1>
+  <div id="state">Sin activar</div>
+  <p id="hint">Toca activar y acepta el permiso de notificaciones. Solo hay que hacerlo una vez.</p>
+  <button id="go">Activar notificaciones</button>
+  <button id="copy" class="ghost" hidden>Copiar suscripcion</button>
+  <textarea id="sub" readonly></textarea>
+
+<script>
+// Pega aqui la llave publica que imprime:  python lol_auto_accept_lan.py --vapid
+var VAPID_PUBLIC_KEY = "BAM5-IbAZwlV2VYOvlvWyXR-QVfOc2awABa3jWQ3IjIrgQ6qFUJofvEirPZqhVaK-Nhz-HSmqChx96JYjEqOAG8";
+
+var stateEl = document.getElementById('state');
+var hintEl = document.getElementById('hint');
+var subEl = document.getElementById('sub');
+
+function say(text, cls) {
+  stateEl.textContent = text;
+  document.body.className = cls || '';
+}
+
+function urlB64ToUint8Array(base64String) {
+  var padding = '='.repeat((4 - base64String.length % 4) % 4);
+  var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  var raw = atob(base64);
+  var out = new Uint8Array(raw.length);
+  for (var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
+document.getElementById('go').addEventListener('click', async function () {
+  if (VAPID_PUBLIC_KEY.indexOf('PEGA_AQUI') === 0) {
+    say('Falta la llave', 'err');
+    hintEl.textContent = 'Todavia no pegaste la llave publica en index.html.';
+    return;
+  }
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    say('Navegador sin soporte', 'err');
+    hintEl.textContent = 'Este navegador no soporta push. Usa Chrome.';
+    return;
+  }
+
+  try {
+    say('Pidiendo permiso...');
+    var permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      say('Permiso denegado', 'err');
+      hintEl.textContent = 'Sin el permiso no hay aviso. Puedes volver a darlo desde los ajustes del sitio en Chrome.';
+      return;
+    }
+
+    var reg = await navigator.serviceWorker.register('./sw.js');
+    await navigator.serviceWorker.ready;
+
+    var sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+
+    say('Activado', 'ok');
+    hintEl.textContent = 'Copia este texto y pegalo en el PC, en el archivo push_subscription.json. Es lo unico manual, y es una sola vez.';
+    subEl.value = JSON.stringify(sub.toJSON());
+    subEl.style.display = 'block';
+    this.hidden = true;
+    document.getElementById('copy').hidden = false;
+  } catch (e) {
+    say('Fallo', 'err');
+    hintEl.textContent = String(e);
+  }
+});
+
+document.getElementById('copy').addEventListener('click', async function () {
+  try {
+    await navigator.clipboard.writeText(subEl.value);
+    this.textContent = 'Copiado';
+  } catch (e) {
+    subEl.select();
+    this.textContent = 'Selecciona y copia a mano';
+  }
+});
+
+// Si ya estaba activado en una visita anterior, mostrarlo de una
+navigator.serviceWorker.getRegistration().then(async function (reg) {
+  if (!reg) return;
+  var sub = await reg.pushManager.getSubscription();
+  if (!sub) return;
+  say('Activado', 'ok');
+  hintEl.textContent = 'Ya estaba activado en este telefono.';
+  subEl.value = JSON.stringify(sub.toJSON());
+  subEl.style.display = 'block';
+  document.getElementById('go').hidden = true;
+  document.getElementById('copy').hidden = false;
+});
+</script>
+</body>
+</html>
