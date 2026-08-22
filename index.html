@@ -29,17 +29,28 @@
   <h1>Aviso de cola</h1>
   <div id="state">Sin activar</div>
   <p id="hint">Toca activar y acepta el permiso de notificaciones. Solo hay que hacerlo una vez.</p>
+  <p id="keyinfo"></p>
   <button id="go">Activar notificaciones</button>
   <button id="copy" class="ghost" hidden>Copiar suscripcion</button>
   <textarea id="sub" readonly></textarea>
 
 <script>
-// Pega aqui la llave publica que imprime:  python lol_auto_accept_lan.py --vapid
-var VAPID_PUBLIC_KEY = "BAM5-IbAZwlV2VYOvlvWyXR-QVfOc2awABa3jWQ3IjIrgQ6qFUJofvEirPZqhVaK-Nhz-HSmqChx96JYjEqOAG8";
+// Llave publica por defecto, la que imprime:  python lol_auto_accept_lan.py --vapid
+var DEFAULT_VAPID_PUBLIC_KEY = "BAM5-IbAZwlV2VYOvlvWyXR-QVfOc2awABa3jWQ3IjIrgQ6qFUJofvEirPZqhVaK-Nhz-HSmqChx96JYjEqOAG8";
+
+// Cualquier otra persona puede usar esta misma pagina con SU propia llave, poniendola
+// detras de un # en la URL. Su suscripcion queda atada a su par de llaves, y solo su
+// PC puede mandarle avisos. Ejemplo:  .../lol-queue-alert/#SU_LLAVE_PUBLICA
+var VAPID_PUBLIC_KEY = decodeURIComponent((location.hash || '').replace(/^#/, '')).trim()
+                       || DEFAULT_VAPID_PUBLIC_KEY;
 
 var stateEl = document.getElementById('state');
 var hintEl = document.getElementById('hint');
 var subEl = document.getElementById('sub');
+
+document.getElementById('keyinfo').textContent =
+  (VAPID_PUBLIC_KEY === DEFAULT_VAPID_PUBLIC_KEY ? 'Llave por defecto: ' : 'Llave propia: ')
+  + VAPID_PUBLIC_KEY.slice(0, 12) + '...';
 
 function say(text, cls) {
   stateEl.textContent = text;
